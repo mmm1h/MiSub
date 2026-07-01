@@ -1,4 +1,4 @@
-name: Fork Sync
+name: Upstream Sync
 
 on:
   schedule:
@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
   actions: write
+
+concurrency:
+  group: upstream-sync-main
+  cancel-in-progress: false
 
 jobs:
   sync_with_upstream:
@@ -19,7 +23,7 @@ jobs:
       - name: Checkout fork
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.SYNC_PAT != '' && secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNC_PAT || github.token }}
           fetch-depth: 0
           ref: main
 
@@ -59,8 +63,10 @@ jobs:
           ORIGIN_SHA="$(git rev-parse origin/main)"
           UPSTREAM_SHA="$(git rev-parse upstream/main)"
 
-          if [ "${ORIGIN_SHA}" = "${UPSTREAM_SHA}" ]; then
-            echo "✨ Fork 已与上游完全一致，无需同步。"
+          git reset --hard origin/main
+
+          if git merge-base --is-ancestor "${UPSTREAM_SHA}" HEAD; then
+            echo "✨ Fork 已包含上游 main，无需同步。"
             exit 0
           fi
 
@@ -72,7 +78,7 @@ jobs:
             fi
           fi
 
-          echo "🚀 正在镜像上游 main，fork 本地 main 上的额外提交会被丢弃。"
-          git reset --hard upstream/main
+          echo "🚀 正在合并上游 main，并保留本 fork 的部署配置。"
+          git merge --no-edit upstream/main
           git push --force-with-lease origin main
-          echo "✅ Fork main 已镜像到上游 main。"
+          echo "✅ Fork main 已同步上游；Cloudflare Pages 将按 Git 集成自动部署。"
