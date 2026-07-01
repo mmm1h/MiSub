@@ -70,6 +70,19 @@ function applyNoStoreToHtmlResponse(response) {
 
 const INTERNAL_SPA_FETCH_HEADER = 'x-misub-internal-spa-fetch';
 const INTERNAL_ORIGIN_ASSET_FETCH_HEADER = 'x-misub-origin-asset-fetch';
+const CANONICAL_HOST = 'misub.hmhi.top';
+const PAGES_DEV_HOST = 'misub-b2l.pages.dev';
+
+function redirectPagesDevHost(url) {
+    const hostname = url.hostname.toLowerCase();
+    if (hostname !== PAGES_DEV_HOST && !hostname.endsWith(`.${PAGES_DEV_HOST}`)) {
+        return null;
+    }
+
+    const redirectUrl = new URL(url);
+    redirectUrl.hostname = CANONICAL_HOST;
+    return Response.redirect(redirectUrl.toString(), 301);
+}
 
 function normalizeLoginPath(customLoginPath) {
     if (typeof customLoginPath !== 'string') return '/login';
@@ -151,6 +164,10 @@ async function fetchSpaEntry(request, env, next) {
 export async function onRequest(context) {
     const { request, env, next } = context;
     const url = new URL(request.url);
+    const pagesDevRedirect = redirectPagesDevHost(url);
+    if (pagesDevRedirect) {
+        return pagesDevRedirect;
+    }
 
     try {
         const handleRequest = async () => {
